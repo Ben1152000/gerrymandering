@@ -1,7 +1,8 @@
 
 class Polygon:
 
-    def __init__(self, coords):
+    def __init__(self, coords, holes=[]):
+        self.holes = holes
         self.points = []
         for x, y in coords:
             self.points.append(
@@ -20,8 +21,11 @@ class Polygon:
             elif y > self.max_y:
                 self.max_y = y
     
-    def to_svg(self, base=(0, 0), fill='#000000'):
-        points = ''
-        for x, y in self.points:
-            points += f'{round(x - base[0], 4)}, {round(y - base[1], 4)} '
-        return f'<polygon points="{points}" fill="{fill}" stroke="black" stroke-width="100" />'
+    def to_svg(self, id, base=(0, 0), fill='#000000'):
+        data = ''
+        for shape in [self.points] + self.holes:
+            points = ''
+            for x, y in shape:
+                points += f'L{round(x - base[0], 4)},{round(y - base[1], 4)} '
+            data += f'M{points[1:]}'
+        return f'<path fill="{fill}" stroke="black" stroke-width="0" d="{data} Z" />\n'

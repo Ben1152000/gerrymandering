@@ -1,16 +1,21 @@
+import math
 from .polygon import Polygon
 from .utils import randomColor
 
 class Precinct:
     
-    def __init__(self, county, id, polycoords):
-        self.county = county
+    def __init__(self, id, county, polycoords, voters={}):
         self.id = id
+        self.county = county
         self.polygons = set()
+        self.voters = voters
 
         for coords in polycoords:
             self.polygons.add(
-                Polygon(coords[0])
+                Polygon(
+                    coords=coords[0], 
+                    holes=coords[1:]
+                )
             )
         
         # calculate bounding box
@@ -31,9 +36,11 @@ class Precinct:
 
     def to_svg(self, base=(0, 0)):
         data = f'<g id="precinct-{self.id}">\n'
+        polygon_id = 0
         for polygon in self.polygons:
-            data += '\t' + polygon.to_svg(
-                base=base, fill=randomColor(self.county + 1)
-            ) + '\n'
+            data += polygon.to_svg(
+                id=f'{self.id}-{polygon_id}', base=base, fill=randomColor(self.id)
+            )
+            polygon_id += 1
         data += '</g>\n'
         return data

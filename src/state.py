@@ -22,28 +22,38 @@ class State:
             if precinct.max_y > self.max_y:
                 self.max_y = precinct.max_y
 
+        # compute neighbors
+        sorted(self.precincts, key=lambda precinct: precinct.min_x)
+        # for precinct in self.precincts:
+        #     print(precinct.min_x)
+
     @staticmethod
     def from_shapefile(filename):
         precincts = set()
         with fiona.open(filename) as source:
             for feature in source:
                 # print(feature)
+                
+                polycoords = feature['geometry']['coordinates']
                 if feature['geometry']['type'] == 'Polygon':
-                    precincts.add(
-                        Precinct(
-                            county=feature['properties']['CNTY'],
-                            id=feature['id'], 
-                            polycoords=[feature['geometry']['coordinates']]
-                        )
+                    polycoords = [polycoords]
+
+                precincts.add(
+                    Precinct(
+                        id=feature['id'], 
+                        county=0,#feature['properties']['CNTYKEY'],
+                        polycoords=polycoords,
+                        voters={
+                            # 'total': feature['properties']['G20VR'],
+                            'trump': feature['properties']['G20PRERTRU'],
+                            'biden': feature['properties']['G20PREDBID'],
+                            'other': feature['properties']['G20PRELJOR']
+                                # + feature['properties']['G20PREGHAW']
+                                # + feature['properties']['G20PREOWRI']
+                        },
                     )
-                elif feature['geometry']['type'] == 'MultiPolygon':
-                    precincts.add(
-                        Precinct(
-                            county=feature['properties']['CNTY'],
-                            id=feature['id'], 
-                            polycoords=feature['geometry']['coordinates']
-                        )
-                    )
+                )
+                
         return State(precincts)
 
     def to_svg(self):
