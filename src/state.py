@@ -1,4 +1,5 @@
 import fiona
+from intervaltree import IntervalTree
 from .precinct import Precinct
 
 class State:
@@ -22,10 +23,31 @@ class State:
             if precinct.max_y > self.max_y:
                 self.max_y = precinct.max_y
 
-        # compute neighbors
-        sorted(self.precincts, key=lambda precinct: precinct.min_x)
-        # for precinct in self.precincts:
-        #     print(precinct.min_x)
+        # compute neighbors for each precinct
+        begins = sorted(self.precincts, key=lambda precinct: precinct.min_x)
+        ends = sorted(self.precincts, key=lambda precinct: precinct.max_x)
+
+        EPSILON = 0.01  # defined as the margin of error for overlapping bounding boxes
+
+        tree = IntervalTree()
+        i = j = 0
+        while (i < len(begins) and j < len(ends)):
+            if (begins[i].min_x - EPSILON < ends[j].max_x + EPSILON):
+                tree.addi(begins[i].min_y - EPSILON, begins[i].max_y + EPSILON, begins[i])
+                i += 1
+            else:
+                tree.removei(ends[j].min_y - EPSILON, ends[j].max_y + EPSILON, ends[j])
+                for interval in tree.overlap(ends[j].min_y - EPSILON, ends[j].max_y + EPSILON):
+                    ends[j].neighbors.add(interval.data)
+                    interval.data.neighbors.add(ends[j])
+                j += 1
+        
+        while (j < len(ends)):
+            tree.removei(ends[j].min_y - EPSILON, ends[j].max_y + EPSILON, ends[j])
+            for interval in tree.overlap(ends[j].min_y - EPSILON, ends[j].max_y + EPSILON):
+                ends[j].neighbors.add(interval.data)
+                interval.data.neighbors.add(ends[j])
+            j += 1
 
     @staticmethod
     def from_shapefile(filename):
@@ -40,7 +62,7 @@ class State:
 
                 precincts.add(
                     Precinct(
-                        id=feature['id'], 
+                        id=int(feature['id']), 
                         county=0,#feature['properties']['CNTYKEY'],
                         polycoords=polycoords,
                         voters={

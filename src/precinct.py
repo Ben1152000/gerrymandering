@@ -1,6 +1,6 @@
 import math
 from .polygon import Polygon
-from .utils import randomColor
+from .utils import *
 
 class Precinct:
     
@@ -34,12 +34,15 @@ class Precinct:
             if polygon.max_y > self.max_y:
                 self.max_y = polygon.max_y
 
+        self.neighbors = set()
+
     def to_svg(self, base=(0, 0)):
+        color = randomColor(self.id)
         data = f'<g id="precinct-{self.id}">\n'
         polygon_id = 0
         for polygon in self.polygons:
             data += polygon.to_svg(
-                id=f'{self.id}-{polygon_id}', base=base, fill=randomColor(self.id)
+                id=f'{self.id}-{polygon_id}', base=base, fill=color
             )
             polygon_id += 1
         data += '</g>\n'
