@@ -10,10 +10,5 @@ def main():
     with open('out.svg', 'w') as svg:
         svg.write(state.to_svg())
     
-    # for precinct in state.precincts:
-    #     for polygon in precinct.polygons:
-    #         for point in polygon.points:
-    #             print(point)
-
 if __name__ == "__main__":
     main()

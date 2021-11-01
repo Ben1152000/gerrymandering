@@ -1,49 +1,46 @@
 import math
-from .polygon import Polygon
+from shapely.geometry import MultiPolygon
+
+# from .polygon import Polygon
 from .utils import *
 
 class Precinct:
     
-    def __init__(self, id, county, polycoords, voters={}):
+    def __init__(self, id, polycoords, county, voters={}):
         self.id = id
+        self.geometry = MultiPolygon([(coords[0], coords[1:]) for coords in polycoords])
+        self.neighbors = set()
         self.county = county
-        self.polygons = set()
         self.voters = voters
 
-        for coords in polycoords:
-            self.polygons.add(
-                Polygon(
-                    coords=coords[0], 
-                    holes=coords[1:]
-                )
-            )
-        
-        # calculate bounding box
-        polygon = next(iter(self.polygons))
-        self.min_x = polygon.min_x
-        self.max_x = polygon.max_x
-        self.min_y = polygon.min_y
-        self.max_y = polygon.max_y
-        for polygon in self.polygons:
-            if polygon.min_x < self.min_x:
-                self.min_x = polygon.min_x
-            if polygon.max_x > self.max_x:
-                self.max_x = polygon.max_x
-            if polygon.min_y < self.min_y:
-                self.min_y = polygon.min_y
-            if polygon.max_y > self.max_y:
-                self.max_y = polygon.max_y
+    def bounds():
+        return self.geometry.bounds
 
-        self.neighbors = set()
+    def length():
+        return self.geometry.length
 
-    def to_svg(self, base=(0, 0)):
-        color = randomColor(self.id)
+    def area():
+        return self.geometry.area
+
+    def to_svg(self, base=(0, 0, 0, 0)):
+        fill = colorFromHue(self.geometry.length)
+        stroke = (base[2] - base[0] + base[3] - base[1]) / 10000.0
+
         data = f'<g id="precinct-{self.id}">\n'
-        polygon_id = 0
-        for polygon in self.polygons:
-            data += polygon.to_svg(
-                id=f'{self.id}-{polygon_id}', base=base, fill=color
-            )
-            polygon_id += 1
+        for polygon in self.geometry.geoms:
+            polygon_data = ''
+
+            points = ''
+            for x, y in polygon.exterior.coords:
+                points += f'L{x - base[0]},{y - base[1]} '
+            polygon_data += f'M{points[1:]}'
+
+            for interior in polygon.interiors:
+                points = ''
+                for x, y in interior.coords:
+                    points += f'L{x - base[0]},{y - base[1]} '
+                polygon_data += f'M{points[1:]}'
+            
+            data += f'<path fill="{fill}" stroke="black" stroke-width="{stroke}" d="{polygon_data} Z" />\n'
         data += '</g>\n'
         return data

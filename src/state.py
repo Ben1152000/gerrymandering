@@ -8,49 +8,59 @@ class State:
         self.precincts = precincts
 
         # calculate bounding box
-        precinct = next(iter(self.precincts))
-        self.min_x = precinct.min_x
-        self.max_x = precinct.max_x
-        self.min_y = precinct.min_y
-        self.max_y = precinct.max_y
+        print('Calculating bounding boxes...')
+        self.bounds = next(iter(self.precincts)).geometry.bounds
         for precinct in self.precincts:
-            if precinct.min_x < self.min_x:
-                self.min_x = precinct.min_x
-            if precinct.max_x > self.max_x:
-                self.max_x = precinct.max_x
-            if precinct.min_y < self.min_y:
-                self.min_y = precinct.min_y
-            if precinct.max_y > self.max_y:
-                self.max_y = precinct.max_y
-
+            self.bounds = (
+                min(self.bounds[0], precinct.geometry.bounds[0]),  # min_x
+                min(self.bounds[1], precinct.geometry.bounds[1]),  # min_y
+                max(self.bounds[2], precinct.geometry.bounds[2]),  # max_x
+                max(self.bounds[3], precinct.geometry.bounds[3]),  # max_y
+            )
+        
         # compute neighbors for each precinct
-        begins = sorted(self.precincts, key=lambda precinct: precinct.min_x)
-        ends = sorted(self.precincts, key=lambda precinct: precinct.max_x)
+        print('Calculating candidates for neighboring precincts...')
+        begins = sorted(
+            self.precincts, 
+            key=lambda precinct: precinct.geometry.bounds[0]
+        )
+        ends = sorted(
+            self.precincts, 
+            key=lambda precinct: precinct.geometry.bounds[2]
+        )
 
-        EPSILON = 0.01  # defined as the margin of error for overlapping bounding boxes
+        EPSILON = 0  # defined as the margin of error for overlapping bounding boxes
 
         tree = IntervalTree()
         i = j = 0
         while (i < len(begins) and j < len(ends)):
-            if (begins[i].min_x - EPSILON < ends[j].max_x + EPSILON):
-                tree.addi(begins[i].min_y - EPSILON, begins[i].max_y + EPSILON, begins[i])
+            if (begins[i].geometry.bounds[0] - EPSILON < ends[j].geometry.bounds[2] + EPSILON):
+                tree.addi(begins[i].geometry.bounds[1] - EPSILON, begins[i].geometry.bounds[3] + EPSILON, begins[i])
                 i += 1
             else:
-                tree.removei(ends[j].min_y - EPSILON, ends[j].max_y + EPSILON, ends[j])
-                for interval in tree.overlap(ends[j].min_y - EPSILON, ends[j].max_y + EPSILON):
+                tree.removei(ends[j].geometry.bounds[1] - EPSILON, ends[j].geometry.bounds[3] + EPSILON, ends[j])
+                for interval in tree.overlap(ends[j].geometry.bounds[1] - EPSILON, ends[j].geometry.bounds[3] + EPSILON):
                     ends[j].neighbors.add(interval.data)
                     interval.data.neighbors.add(ends[j])
                 j += 1
-        
         while (j < len(ends)):
-            tree.removei(ends[j].min_y - EPSILON, ends[j].max_y + EPSILON, ends[j])
-            for interval in tree.overlap(ends[j].min_y - EPSILON, ends[j].max_y + EPSILON):
+            tree.removei(ends[j].geometry.bounds[1] - EPSILON, ends[j].geometry.bounds[3] + EPSILON, ends[j])
+            for interval in tree.overlap(ends[j].geometry.bounds[1] - EPSILON, ends[j].geometry.bounds[3] + EPSILON):
                 ends[j].neighbors.add(interval.data)
                 interval.data.neighbors.add(ends[j])
             j += 1
 
+        print('Calculating neighboring precincts...')
+        for precinct in self.precincts:
+            true_neighbors = set()
+            for neighbor in precinct.neighbors:
+                if neighbor.geometry.touches(precinct.geometry):
+                    true_neighbors.add(neighbor)
+            precinct.neighbors = true_neighbors
+
     @staticmethod
     def from_shapefile(filename):
+        print('Reading shapefile data...')
         precincts = set()
         with fiona.open(filename) as source:
             for feature in source:
@@ -79,9 +89,10 @@ class State:
         return State(precincts)
 
     def to_svg(self):
-        data = f'<svg viewBox="{0} {0} {round(self.max_x - self.min_x, 4)} {round(self.max_y - self.min_y, 4)}" xmlns="http://www.w3.org/2000/svg">\n'
-        data += f'<rect x="{0}" y="{0}" width="{round(self.max_x - self.min_x, 4)}" height="{round(self.max_y - self.min_y, 4)}" fill="#ffffff" />\n'
+        print('Generating vector image...')
+        data = f'<svg viewBox="{0} {0} {self.bounds[2] - self.bounds[0]} {self.bounds[3] - self.bounds[1]}" xmlns="http://www.w3.org/2000/svg">\n'
+        data += f'<rect x="{0}" y="{0}" width="{self.bounds[2] - self.bounds[0]}" height="{self.bounds[3] - self.bounds[1]}" fill="#ffffff" />\n'
         for precinct in self.precincts:
-            data += precinct.to_svg(base=(self.min_x, self.min_y))
+            data += precinct.to_svg(base=self.bounds)
         data += '</svg>'
         return data
