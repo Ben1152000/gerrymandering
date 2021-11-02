@@ -1,14 +1,14 @@
 import sys
 from src import State
 
-FILENAME = 'nh_vest_20'
+FILENAME = 'ca_vest_20'
 
 def main():
 
-    state = State.from_shapefile(f'{FILENAME}/{FILENAME}.shp')
+    state = State.from_shapefile(f'datasets/{FILENAME}/{FILENAME}.shp')
 
     with open('out.svg', 'w') as svg:
-        svg.write(state.to_svg())
+        svg.write(state.to_svg(scale=10000.0))
     
 if __name__ == "__main__":
     main()

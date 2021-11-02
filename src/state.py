@@ -29,7 +29,8 @@ class State:
             key=lambda precinct: precinct.geometry.bounds[2]
         )
 
-        EPSILON = 0  # defined as the margin of error for overlapping bounding boxes
+        # defined as the margin of error for overlapping bounding boxes
+        EPSILON = (self.bounds[2] - self.bounds[0] + self.bounds[3] - self.bounds[1]) / 1000.0
 
         tree = IntervalTree()
         i = j = 0
@@ -54,7 +55,7 @@ class State:
         for precinct in self.precincts:
             true_neighbors = set()
             for neighbor in precinct.neighbors:
-                if neighbor.geometry.touches(precinct.geometry):
+                if neighbor.geometry.intersects(precinct.geometry):
                     true_neighbors.add(neighbor)
             precinct.neighbors = true_neighbors
 
@@ -88,11 +89,22 @@ class State:
                 
         return State(precincts)
 
-    def to_svg(self):
+    def to_svg(self, scale=10000.0):
+        scale = (self.bounds[2] - self.bounds[0] + self.bounds[3] - self.bounds[1]) / scale
+        
         print('Generating vector image...')
         data = f'<svg viewBox="{0} {0} {self.bounds[2] - self.bounds[0]} {self.bounds[3] - self.bounds[1]}" xmlns="http://www.w3.org/2000/svg">\n'
+
         data += f'<rect x="{0}" y="{0}" width="{self.bounds[2] - self.bounds[0]}" height="{self.bounds[3] - self.bounds[1]}" fill="#ffffff" />\n'
         for precinct in self.precincts:
-            data += precinct.to_svg(base=self.bounds)
+            data += precinct.to_svg(base=self.bounds, stroke=scale)
+        
+        # Graph of neighboring precincts:
+        # for precinct in self.precincts:
+        #     for neighbor in precinct.neighbors:
+        #         data += f'<line x1="{precinct.point().x - self.bounds[0]}" y1="{precinct.point().y - self.bounds[1]}" x2="{neighbor.point().x - self.bounds[0]}" y2="{neighbor.point().y - self.bounds[1]}" stroke="black" stroke-width="{scale * 3}"/>'
+        # for precinct in self.precincts:
+        #     data += f'<circle cx="{precinct.point().x - self.bounds[0]}" cy="{precinct.point().y - self.bounds[1]}" r="{scale * 6}" stroke="black" fill="green" stroke-width="{scale * 3}" />'
+
         data += '</svg>'
         return data

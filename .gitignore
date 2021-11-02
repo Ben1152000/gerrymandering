@@ -2,8 +2,7 @@ __pycache__
 .DS_Store
 .vscode
 
-tx_vest_18/
-ga_vest_16/
+datasets/
 img/
 
 out.svg
