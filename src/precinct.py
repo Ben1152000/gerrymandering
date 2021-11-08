@@ -6,31 +6,46 @@ from .utils import *
 
 class Precinct:
     
-    def __init__(self, id, polycoords, county, voters={}):
-        self.id = id
-        self.geometry = MultiPolygon([(coords[0], coords[1:]) for coords in polycoords])
+    def __init__(self, geometry, data=dict()):
+        assert type(geometry) is MultiPolygon
+        self.geometry = geometry
         self.neighbors = set()
-        self.county = county
-        self.voters = voters
+        self.boundaries = dict()
+        self.data = data
 
     def bounds(self):
+        """Return the bounding box of the precinct geometry."""
         return self.geometry.bounds
 
     def length(self):
+        """Return the total boundary length of the precinct geometry."""
         return self.geometry.length
 
     def area(self):
+        """Return the total area of the precinct geometry."""
         return self.geometry.area
 
     def point(self):
+        """Return a representative point guaranteed to be within the precinct."""
         return self.geometry.representative_point()
 
     def partisan_lean(self):
-        if self.voters['biden'] + self.voters['trump'] == 0:
+        """Return the percentage of democratic voters in the precinct."""
+        
+        if 'voters' not in self.data:
             return None
-        return self.voters['biden'] / (self.voters['biden'] + self.voters['trump'])
+        voters = self.data['voters']
+        if 'biden' not in voters or 'trump' not in voters:
+            return None
+        biden = voters['biden']
+        trump = voters['trump']
+        if biden + trump == 0:
+            return None
+        return biden / (biden + trump)
 
     def to_svg(self, base=(0, 0, 0, 0), stroke=0):
+        """Convert the precinct to a svg vector image."""
+
         lean = self.partisan_lean()
         if lean is None:
             fill = 'grey'
@@ -39,9 +54,7 @@ class Precinct:
         else:
             fill = f'#{int((1 - lean) * 2 * 255):02x}{int((1 - lean) * 2 * 255):02x}ff'
 
-        # fill = colorFromHue()
-
-        data = f'<g id="precinct-{self.id}">\n'
+        data = f'<g>\n'
         for polygon in self.geometry.geoms:
             polygon_data = ''
 

@@ -1,6 +1,8 @@
 import fiona
 from intervaltree import IntervalTree
 from .precinct import Precinct
+from shapely.geometry import MultiPolygon
+from scipy.spatial import KDTree
 
 class State:
     
@@ -21,7 +23,7 @@ class State:
         # compute neighbors for each precinct
         print('Calculating candidates for neighboring precincts...')
         begins = sorted(
-            self.precincts, 
+            self.precincts,
             key=lambda precinct: precinct.geometry.bounds[0]
         )
         ends = sorted(
@@ -30,7 +32,7 @@ class State:
         )
 
         # defined as the margin of error for overlapping bounding boxes
-        EPSILON = (self.bounds[2] - self.bounds[0] + self.bounds[3] - self.bounds[1]) / 1000.0
+        EPSILON = (self.bounds[2] - self.bounds[0] + self.bounds[3] - self.bounds[1]) / 10000.0
 
         tree = IntervalTree()
         i = j = 0
@@ -51,7 +53,7 @@ class State:
                 interval.data.neighbors.add(ends[j])
             j += 1
 
-        print('Calculating neighboring precincts...')
+        print('Pruning neighboring precincts...')
         for precinct in self.precincts:
             true_neighbors = set()
             for neighbor in precinct.neighbors:
@@ -63,29 +65,30 @@ class State:
     def from_shapefile(filename):
         print('Reading shapefile data...')
         precincts = set()
+        
         with fiona.open(filename) as source:
             for feature in source:
-                # print(feature)
                 
                 polycoords = feature['geometry']['coordinates']
                 if feature['geometry']['type'] == 'Polygon':
                     polycoords = [polycoords]
+                # geometry = MultiPolygon([(coords[0], coords[1:]) for coords in polycoords])
+                geometry = MultiPolygon([([coord[0:2] for coord in coords[0]], [[coord[0:2] for coord in hole] for hole in coords[1:]]) for coords in polycoords])
 
-                precincts.add(
-                    Precinct(
-                        id=int(feature['id']), 
-                        county=0,#feature['properties']['CNTYKEY'],
-                        polycoords=polycoords,
-                        voters={
-                            # 'total': feature['properties']['G20VR'],
-                            'trump': feature['properties']['G20PRERTRU'],
-                            'biden': feature['properties']['G20PREDBID'],
-                            'other': feature['properties']['G20PRELJOR']
-                                # + feature['properties']['G20PREGHAW']
-                                # + feature['properties']['G20PREOWRI']
-                        },
-                    )
-                )
+                data = {
+                    'id': int(feature['id']),
+                    'county': 0,#feature['properties']['CNTYKEY'],
+                    'voters': {
+                        # 'total': feature['properties']['G20VR'],
+                        'trump': feature['properties']['G20PRERTRU'],
+                        'biden': feature['properties']['G20PREDBID'],
+                        'other': feature['properties']['G20PRELJOR']
+                            # + feature['properties']['G20PREGHAW']
+                            # + feature['properties']['G20PREOWRI']
+                    }
+                }
+                
+                precincts.add(Precinct(geometry=geometry, data=data))
                 
         return State(precincts)
 
@@ -100,11 +103,11 @@ class State:
             data += precinct.to_svg(base=self.bounds, stroke=scale)
         
         # Graph of neighboring precincts:
-        # for precinct in self.precincts:
-        #     for neighbor in precinct.neighbors:
-        #         data += f'<line x1="{precinct.point().x - self.bounds[0]}" y1="{precinct.point().y - self.bounds[1]}" x2="{neighbor.point().x - self.bounds[0]}" y2="{neighbor.point().y - self.bounds[1]}" stroke="black" stroke-width="{scale * 3}"/>'
-        # for precinct in self.precincts:
-        #     data += f'<circle cx="{precinct.point().x - self.bounds[0]}" cy="{precinct.point().y - self.bounds[1]}" r="{scale * 6}" stroke="black" fill="green" stroke-width="{scale * 3}" />'
+        for precinct in self.precincts:
+            for neighbor in precinct.neighbors:
+                data += f'<line x1="{precinct.point().x - self.bounds[0]}" y1="{precinct.point().y - self.bounds[1]}" x2="{neighbor.point().x - self.bounds[0]}" y2="{neighbor.point().y - self.bounds[1]}" stroke="black" stroke-width="{scale * 3}" />\n'
+        for precinct in self.precincts:
+            data += f'<circle cx="{precinct.point().x - self.bounds[0]}" cy="{precinct.point().y - self.bounds[1]}" r="{scale * 6}" stroke="black" fill="green" stroke-width="{scale * 3}" />\n'
 
         data += '</svg>'
         return data
