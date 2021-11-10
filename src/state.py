@@ -1,8 +1,9 @@
 import fiona
 from intervaltree import IntervalTree
-from .precinct import Precinct
 from shapely.geometry import MultiPolygon
 from scipy.spatial import KDTree
+
+from .precinct import Precinct
 
 class State:
     
@@ -34,6 +35,7 @@ class State:
         # defined as the margin of error for overlapping bounding boxes
         EPSILON = (self.bounds[2] - self.bounds[0] + self.bounds[3] - self.bounds[1]) / 10000.0
 
+        # use an interval tree to calculate intersections of bounding boxes
         tree = IntervalTree()
         i = j = 0
         while (i < len(begins) and j < len(ends)):
@@ -53,6 +55,7 @@ class State:
                 interval.data.neighbors.add(ends[j])
             j += 1
 
+        # test whether shapes whose bounding boxes intersect actually intersect
         print('Pruning neighboring precincts...')
         for precinct in self.precincts:
             true_neighbors = set()
@@ -64,7 +67,7 @@ class State:
     @staticmethod
     def from_shapefile(filename):
         print('Reading shapefile data...')
-        precincts = set()
+        precincts = []  # this should really be a set, but you can select a random item from a set in python
         
         with fiona.open(filename) as source:
             for feature in source:
@@ -77,7 +80,7 @@ class State:
 
                 data = {
                     'id': int(feature['id']),
-                    'county': 0,#feature['properties']['CNTYKEY'],
+                    'county': int(feature['properties']['COUNTY']),
                     'voters': {
                         # 'total': feature['properties']['G20VR'],
                         'trump': feature['properties']['G20PRERTRU'],
@@ -88,11 +91,12 @@ class State:
                     }
                 }
                 
-                precincts.add(Precinct(geometry=geometry, data=data))
+                precincts.append(Precinct(geometry=geometry, data=data))
                 
         return State(precincts)
 
-    def to_svg(self, scale=10000.0):
+    def to_svg(self, selector=(lambda precinct: 'grey'), scale=10000.0):
+        """Displays the state as an svg, using a colorSelector lambda function that takes in the precinct and returns the color in hex."""
         scale = (self.bounds[2] - self.bounds[0] + self.bounds[3] - self.bounds[1]) / scale
         
         print('Generating vector image...')
@@ -100,7 +104,7 @@ class State:
 
         data += f'<rect x="{0}" y="{0}" width="{self.bounds[2] - self.bounds[0]}" height="{self.bounds[3] - self.bounds[1]}" fill="#ffffff" />\n'
         for precinct in self.precincts:
-            data += precinct.to_svg(base=self.bounds, stroke=scale)
+            data += precinct.to_svg(base=self.bounds, stroke=scale, color=selector(precinct))
         
         # Graph of neighboring precincts:
         for precinct in self.precincts:

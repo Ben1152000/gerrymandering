@@ -29,7 +29,7 @@ class Precinct:
         """Return a representative point guaranteed to be within the precinct."""
         return self.geometry.representative_point()
 
-    def partisan_lean(self):
+    def lean(self):
         """Return the percentage of democratic voters in the precinct."""
         
         if 'voters' not in self.data:
@@ -43,16 +43,8 @@ class Precinct:
             return None
         return biden / (biden + trump)
 
-    def to_svg(self, base=(0, 0, 0, 0), stroke=0):
+    def to_svg(self, base=(0, 0, 0, 0), stroke=0, color='grey'):
         """Convert the precinct to a svg vector image."""
-
-        lean = self.partisan_lean()
-        if lean is None:
-            fill = 'grey'
-        elif lean < 0.5:
-            fill = f'#ff{int(lean * 2 * 255):02x}{int(lean * 2 * 255):02x}'
-        else:
-            fill = f'#{int((1 - lean) * 2 * 255):02x}{int((1 - lean) * 2 * 255):02x}ff'
 
         data = f'<g>\n'
         for polygon in self.geometry.geoms:
@@ -69,6 +61,6 @@ class Precinct:
                     points += f'L{coords[0] - base[0]},{coords[1] - base[1]} '
                 polygon_data += f'M{points[1:]}'
             
-            data += f'<path fill="{fill}" stroke="black" stroke-width="{stroke}" d="{polygon_data} Z" />\n'
+            data += f'<path fill="{color}" stroke="black" stroke-width="{stroke}" d="{polygon_data} Z" />\n'
         data += '</g>\n'
         return data
